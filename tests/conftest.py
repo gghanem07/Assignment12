@@ -32,14 +32,14 @@ logger = logging.getLogger(__name__)
 fake = Faker()
 Faker.seed(12345)
 
-test_engine = get_engine(database_url=settings.DATABASE_URL)
+
+test_engine = get_engine(database_url=settings.TEST_DATABASE_URL)
 TestingSessionLocal = get_sessionmaker(engine=test_engine)
 
 # ======================================================================================
 # Helper Functions
 # ======================================================================================
 def create_fake_user() -> Dict[str, str]:
-    """Generate a dictionary of fake user data for testing."""
     return {
         "first_name": fake.first_name(),
         "last_name": fake.last_name(),
@@ -50,7 +50,6 @@ def create_fake_user() -> Dict[str, str]:
 
 @contextmanager
 def managed_db_session():
-    """Context manager for safe database session handling."""
     session = TestingSessionLocal()
     try:
         yield session
@@ -65,10 +64,6 @@ def managed_db_session():
 # Server Startup / Healthcheck
 # ======================================================================================
 def wait_for_server(url: str, timeout: int = 30) -> bool:
-    """
-    Wait for the server to be ready by repeatedly issuing GET requests until
-    we receive a 200 status code or hit the timeout.
-    """
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         try:
@@ -80,7 +75,6 @@ def wait_for_server(url: str, timeout: int = 30) -> bool:
     return False
 
 class ServerStartupError(Exception):
-    """Raised when the test server fails to start properly."""
     pass
 
 # ======================================================================================
@@ -88,10 +82,6 @@ class ServerStartupError(Exception):
 # ======================================================================================
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database(request):
-    """
-    Set up the test database before the session starts, and tear it down after tests
-    unless --preserve-db is provided.
-    """
     logger.info("Setting up test database...")
     try:
         Base.metadata.drop_all(bind=test_engine)
@@ -102,7 +92,7 @@ def setup_test_database(request):
         logger.error(f"Error setting up test database: {str(e)}")
         raise
 
-    yield  # Tests run after this
+    yield
 
     if not request.config.getoption("--preserve-db"):
         logger.info("Dropping test database tables...")
@@ -110,10 +100,6 @@ def setup_test_database(request):
 
 @pytest.fixture
 def db_session() -> Generator[Session, None, None]:
-    """
-    Provide a test-scoped database session. Commits after a successful test;
-    rolls back if an exception occurs.
-    """
     session = TestingSessionLocal()
     try:
         yield session
@@ -129,14 +115,10 @@ def db_session() -> Generator[Session, None, None]:
 # ======================================================================================
 @pytest.fixture
 def fake_user_data() -> Dict[str, str]:
-    """Provide fake user data."""
     return create_fake_user()
 
 @pytest.fixture
 def test_user(db_session: Session) -> User:
-    """
-    Create and return a single test user in the database.
-    """
     user_data = create_fake_user()
     user = User(**user_data)
     db_session.add(user)
@@ -147,10 +129,6 @@ def test_user(db_session: Session) -> User:
 
 @pytest.fixture
 def seed_users(db_session: Session, request) -> List[User]:
-    """
-    Seed multiple test users in the database. By default, 5 users are created
-    unless a 'param' value is provided (e.g., via @pytest.mark.parametrize).
-    """
     num_users = getattr(request, "param", 5)
     users = [User(**create_fake_user()) for _ in range(num_users)]
     db_session.add_all(users)
@@ -162,22 +140,15 @@ def seed_users(db_session: Session, request) -> List[User]:
 # FastAPI Server Fixture
 # ======================================================================================
 def find_available_port() -> int:
-    """Find an available port for the test server by binding to port 0."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', 0))
         return s.getsockname()[1]
 
 @pytest.fixture(scope="session")
 def fastapi_server():
-    """
-    Start a FastAPI test server in a subprocess. If the chosen port (default: 8000)
-    is already in use, find another available port. Wait until the server is up
-    before yielding its base URL.
-    """
     base_port = 8000
     server_url = f'http://127.0.0.1:{base_port}/'
 
-    # Check if port is free; if not, pick an available port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         if s.connect_ex(('127.0.0.1', base_port)) == 0:
             base_port = find_available_port()
@@ -190,10 +161,9 @@ def fastapi_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        cwd='.'  # ensure the working directory is set correctly
+        cwd='.'
     )
 
-    # IMPORTANT: Use the /health endpoint for the check!
     health_url = f"{server_url}health"
     if not wait_for_server(health_url, timeout=30):
         stderr = process.stderr.read()
@@ -214,11 +184,10 @@ def fastapi_server():
         logger.warning("Test server forcefully stopped.")
 
 # ======================================================================================
-# Playwright Fixtures for UI Testing
+# Playwright Fixtures
 # ======================================================================================
 @pytest.fixture(scope="session")
 def browser_context():
-    """Provide a Playwright browser context for UI tests (session-scoped)."""
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
             headless=True,
@@ -233,10 +202,6 @@ def browser_context():
 
 @pytest.fixture
 def page(browser_context: Browser):
-    """
-    Provide a new browser page for each test, with a standard viewport.
-    Closes the page and context after each test.
-    """
     context = browser_context.new_context(
         viewport={'width': 1920, 'height': 1080},
         ignore_https_errors=True
@@ -251,21 +216,13 @@ def page(browser_context: Browser):
         context.close()
 
 # ======================================================================================
-# Pytest Command-Line Options
+# Pytest Options
 # ======================================================================================
 def pytest_addoption(parser):
-    """
-    Add custom command line options:
-      --preserve-db : Keep test database after tests
-      --run-slow    : Run tests marked as 'slow'
-    """
     parser.addoption("--preserve-db", action="store_true", help="Keep test database after tests")
     parser.addoption("--run-slow", action="store_true", help="Run tests marked as slow")
 
 def pytest_collection_modifyitems(config, items):
-    """
-    Skip tests marked as 'slow' unless --run-slow is specified.
-    """
     if not config.getoption("--run-slow"):
         skip_slow = pytest.mark.skip(reason="use --run-slow to run")
         for item in items:
