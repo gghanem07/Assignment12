@@ -1,6 +1,81 @@
-# 📦 Project Setup
+#  Project Setup
 
 ---
+# Assignment 12 – FastAPI Calculations API
+
+##  Overview
+This project is a FastAPI-based backend application that implements:
+
+- User authentication (register + login)
+- Calculation CRUD operations (BREAD)
+- PostgreSQL database integration
+- Dockerized environment
+- Integration and unit testing with pytest
+
+This assignment completes the backend logic and prepares the application for CI/CD deployment.
+
+---
+
+## 🚀 Features
+
+###  User Authentication
+- Register a new user
+- Login with hashed password verification
+- Token-based authentication (JWT)
+
+###  Calculation Endpoints (BREAD)
+- **Browse**: `GET /calculations`
+- **Read**: `GET /calculations/{id}`
+- **Edit**: `PUT /calculations/{id}`
+- **Add**: `POST /calculations`
+- **Delete**: `DELETE /calculations/{id}`
+
+###  Health Check
+- `GET /health`
+
+---
+
+##  Running the Application (Docker)
+
+### 1. Start the app
+
+```bash
+docker compose up --build
+
+### 2. Open swagger UI
+
+http://localhost:8000/docs
+
+### 3. running tests 
+
+docker compose run --rm web pytest --no-cov
+
+### Database
+PostgreSQL running in Docker
+Two databases:
+ > fastapi_db (main)
+ > fastapi_test_db (testing)
+
+# Testing Strategy
+
+## This project includes:
+
+Unit Tests – test core logic
+Integration Tests – test API + database
+End-to-End Tests – test full workflows
+
+Test coverage includes:
+
+User registration and login
+Calculation CRUD operations
+Database interactions
+Input validation and error handling
+
+## Screenshots
+Swagger UI
+
+Tests Passing
+
 
 # 🧩 1. Install Homebrew (Mac Only)
 
