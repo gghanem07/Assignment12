@@ -16,7 +16,7 @@ This assignment completes the backend logic and prepares the application for CI/
 
 ---
 
-## 🚀 Features
+##  Features
 
 ###  User Authentication
 - Register a new user
